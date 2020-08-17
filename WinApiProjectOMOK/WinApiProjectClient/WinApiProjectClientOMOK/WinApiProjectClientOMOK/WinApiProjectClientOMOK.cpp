@@ -18,7 +18,7 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 // >> : OMOK Start
 #define BSIZE 15				// 클릭 판정을 위한 원의 반지름
 #define LinetoLineSize 36		// 바둑판 선과 선 사이의 간격
-#define LineNumber 18			// 바둑판 사이즈 19 × 19 (0부터 이므로 18)
+#define LINENUMBER 18			// 바둑판 사이즈 19 × 19 (0부터 이므로 18)
 
 HBITMAP hBlackImage;			// 흑돌
 BITMAP bitBlack;				
@@ -33,8 +33,8 @@ void DeleteBitmap();
 
 																												 //	 0 : 돌이 없는 상태
 // 돌 놓기 판정																									 //  1 : 플레이어 1의 돌이 존재(흑돌)
-int board[LineNumber + 8][LineNumber + 8];					// 서버와 클라이언트가 서로 주고 받는 board 배열	 // -1 : 플레이어 2의 돌이 존재(백돌)
-POINT checkboard[LineNumber + 1][LineNumber + 1];																 // -2 : 바둑판 외곽처리
+int board[LINENUMBER + 8][LINENUMBER + 8];					// 서버와 클라이언트가 서로 주고 받는 board 배열	 // -1 : 플레이어 2의 돌이 존재(백돌)
+POINT checkboard[LINENUMBER + 1][LINENUMBER + 1];																 // -2 : 바둑판 외곽처리
 double LengthPts(int x1, int y1, int x2, int y2)																
 {																												
 	return (sqrt((float)((x2 - x1)*(x2 - x1) + (y2 - y1)*(y2 - y1))));
@@ -51,6 +51,13 @@ BOOL InCircle(int x, int y, int mx, int my)
 BOOL WinLossDecisionBlack(int x, int y);
 BOOL WinLossDecisionWhite(int x, int y);
 
+// 보낼 구조체(client누구인지, 돌을 놓은 좌표)
+typedef struct PlayerGoxy
+{
+	int client;
+	int x;
+	int y;
+}PlayerGoxy;
 // >> : OMOK END
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
 {
@@ -103,7 +110,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	HDC hdc;
 	PAINTSTRUCT ps;
-	static int x, y;
+	static PlayerGoxy xy;
+	// static int x, y;
 	static BOOL SelectionBlack;
 	static BOOL SelectionWhite;
 	int mx, my;
@@ -118,16 +126,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		int i, j;
 		CreateBitmap();
 		// board 배열 초기화
-		for (i = 0; i <= LineNumber + 4; i++)
-			for (j = 0; j <= LineNumber + 4; j++)
+		for (i = 0; i <= LINENUMBER + 4; i++)
+			for (j = 0; j <= LINENUMBER + 4; j++)
 				board[i][j] = -2;
-		for (i = 4; i <= 4 + LineNumber; i++)
-			for (j = 4; j <= 4 + LineNumber; j++)
+		for (i = 4; i <= 4 + LINENUMBER; i++)
+			for (j = 4; j <= 4 + LINENUMBER; j++)
 				board[i][j] = 0;
 		// 돌 놓기 판정 
-		for (i = 0; i <= LineNumber; i++)
+		for (i = 0; i <= LINENUMBER; i++)
 		{
-			for (j = 0; j <= LineNumber; j++)
+			for (j = 0; j <= LINENUMBER; j++)
 			{
 				checkboard[i][j].x = 475 + LinetoLineSize * i;
 				checkboard[i][j].y = 30 + LinetoLineSize * j;
@@ -155,21 +163,25 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_LBUTTONDOWN:
 		mx = LOWORD(lParam);
 		my = HIWORD(lParam);
-		for (int i = 0; i <= LineNumber; i++)
+		for (int i = 0; i <= LINENUMBER; i++)
 		{
-			for (int j = 0; j <= LineNumber; j++)
+			for (int j = 0; j <= LINENUMBER; j++)
 			{
 				if (InCircle(checkboard[i][j].x, checkboard[i][j].y, mx, my))
 				{	
 					if (board[i + 4][j + 4] == 0)
 					{
-						x = i;
-						y = j;
+						xy.x = i;
+						xy.y = j;
+						//int retval;
+						//int len = sizeof(xy);
+						//retval = send(server, (char *)&len, sizeof(int), 0);
+						//retval = send(server, (char *)&xy, sizeof(PlayerGoxy), 0);
 						SelectionBlack = TRUE;
 						board[i + 4][j + 4] = 1;
 						InvalidateRgn(hWnd, NULL, FALSE);
 					}
-					i = LineNumber+1;
+					i = LINENUMBER+1;
 					break;
 				}
 			}
@@ -179,21 +191,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_RBUTTONDOWN:
 		mx = LOWORD(lParam);
 		my = HIWORD(lParam);
-		for (int i = 0; i <= LineNumber; i++)
+		for (int i = 0; i <= LINENUMBER; i++)
 		{
-			for (int j = 0; j <= LineNumber; j++)
+			for (int j = 0; j <= LINENUMBER; j++)
 			{
 				if (InCircle(checkboard[i][j].x, checkboard[i][j].y, mx, my))
 				{
 					if (board[i + 4][j + 4] == 0)
 					{
-						x = i;
-						y = j;
+						xy.x = i;
+						xy.y = j;
 						SelectionWhite = TRUE;
 						board[i + 4][j + 4] = -1;
 						InvalidateRgn(hWnd, NULL, FALSE);
 					}
-					i = LineNumber + 1;
+					i = LINENUMBER + 1;
 					break;
 				}
 			}
@@ -205,20 +217,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			DrawBitmap(hWnd, hdc);
 			if (SelectionBlack)
 			{
-				DrawStoneBlack(hWnd, hdc, x, y);
+				DrawStoneBlack(hWnd, hdc, xy.x, xy.y);
 				SelectionBlack = FALSE;
 			}
 			if (SelectionWhite)
 			{
-				DrawStoneWhite(hWnd, hdc, x, y);
+				DrawStoneWhite(hWnd, hdc, xy.x, xy.y);
 				SelectionWhite = FALSE;
 			}
-			if (WinLossDecisionBlack(x + 4, y + 4))
+			if (WinLossDecisionBlack(xy.x + 4, xy.y + 4))
 			{
 				TCHAR Player1WIN[] = _T("1P WIN!!!");
 				TextOut(hdc, 20, 20, Player1WIN, _tcslen(Player1WIN));
 			}
-			if (WinLossDecisionWhite(x + 4, y + 4))
+			if (WinLossDecisionWhite(xy.x + 4, xy.y + 4))
 			{
 				TCHAR Player2WIN[] = _T("2P WIN!!!");
 				TextOut(hdc, 20, 20, Player2WIN, _tcslen(Player2WIN));
@@ -251,12 +263,12 @@ void DrawBitmap(HWND hWnd, HDC hdc)
 	HBITMAP hOldBitmap;
 	int bx, by;
 	// 기본 UI
-	for (int i = 0; i <= LineNumber; i++)
+	for (int i = 0; i <= LINENUMBER; i++)
 	{	// 바둑판 격자
 		MoveToEx(hdc, 475, 30 + LinetoLineSize * i, NULL);
-		LineTo(hdc, 475 + LinetoLineSize * LineNumber, 30 + LinetoLineSize * i);
+		LineTo(hdc, 475 + LinetoLineSize * LINENUMBER, 30 + LinetoLineSize * i);
 		MoveToEx(hdc, 475 + LinetoLineSize * i, 30, NULL);
-		LineTo(hdc, 475 + LinetoLineSize * i, 30 + LinetoLineSize * LineNumber);
+		LineTo(hdc, 475 + LinetoLineSize * i, 30 + LinetoLineSize * LINENUMBER);
 	}
 	{	// 흑돌
 		hMenDC = CreateCompatibleDC(hdc);
@@ -284,34 +296,6 @@ void DrawBitmap(HWND hWnd, HDC hdc)
 		TextOut(hdc, 1189, 35, Player1, _tcslen(Player1));	// 1P 출력
 		TextOut(hdc, 1189, 77, Player2, _tcslen(Player2));	// 2P 출력
 	}
-
-	 //돌을 놓은 이후의 UI
-	//{	// 흑돌
-	//	hMenDC = CreateCompatibleDC(hdc);
-	//	hOldBitmap = (HBITMAP)SelectObject(hMenDC, hBlackImage);
-	//	bx = bitBlack.bmWidth;
-	//	by = bitBlack.bmHeight;
-	//	//BitBlt(hdc, 1132, 15, bx, by, hMenDC, 0, 0, SRCCOPY);
-	//	for (int i = 0; i <= 18; i++)
-	//	{
-	//		TransparentBlt(hdc, 459 + 36 * i, 14, bx, by, hMenDC, 0, 0, bx, by, RGB(255, 0, 255));
-	//	}
-	//	SelectObject(hMenDC, hOldBitmap);
-	//	DeleteDC(hMenDC);
-	//}
-	//{	// 백돌
-	//	hMenDC = CreateCompatibleDC(hdc);
-	//	hOldBitmap = (HBITMAP)SelectObject(hMenDC, hWhiteImage);
-	//	bx = bitWhite.bmWidth;
-	//	by = bitWhite.bmHeight;
-	//	//BitBlt(hdc, 1132, 57, bx, by, hMenDC, 0, 0, SRCCOPY);
-	//	for (int i = 1; i <= 18; i++)
-	//	{
-	//		TransparentBlt(hdc, 459, 14 + 36 * i, bx, by, hMenDC, 0, 0, bx, by, RGB(255, 0, 255));
-	//	}
-	//	SelectObject(hMenDC, hOldBitmap);
-	//	DeleteDC(hMenDC);
-	//}
 }
 void DrawStoneBlack(HWND hWnd, HDC hdc, int x, int y)
 {

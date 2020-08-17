@@ -13,6 +13,12 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
+// >> : OMOK Start
+#define MAXCLIENT 4							// 최대 접속 클라이언트 수
+#define LINENUMBER 18						// 바둑판 사이즈 19 × 19 (0부터 이므로 18)
+int board[LINENUMBER + 8][LINENUMBER + 8];	// 서버와 클라이언트가 서로 주고 받는 board 배열
+BOOL WinLossDecision(int x, int y);			// 승패 판정
+// >> : OMOK End
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
 {
 	UNREFERENCED_PARAMETER(hPrevInstance);
@@ -64,10 +70,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	HDC hdc;
 	PAINTSTRUCT ps;
+	// 네트워크 부분
 	static WSADATA wsadata;
-	static SOCKET server, client1, client2;
-	static SOCKADDR_IN	sddr = { 0 }, c1ddr, c2ddr;
-	int c1size, c2size;
+	static SOCKET server;
+	static SOCKET client[MAXCLIENT];
+	static SOCKADDR_IN	sddr = { 0 }, cddr[MAXCLIENT];
+	int clientindex = 0;
+	int csize[MAXCLIENT];
 	switch (message)
 	{
 	case WM_CREATE:
@@ -83,7 +92,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			MessageBox(NULL, _T("server binding success"), _T("Success"), MB_OK);
 		}
-		if (listen(server, 2) == SOCKET_ERROR)
+		if (listen(server, MAXCLIENT) == SOCKET_ERROR)
 		{
 			MessageBox(NULL, _T("listen failed"), _T("Error"), MB_OK);
 			return 0;
@@ -93,23 +102,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			MessageBox(NULL, _T("listen success"), _T("Success"), MB_OK);
 		}
 		WSAAsyncSelect(server, hWnd, WM_ASYNC, FD_ACCEPT);
-		//c1size = sizeof(c1ddr);
-		//c2size = sizeof(c2ddr);
-		//if (client1 = accept(server, (LPSOCKADDR)&c1ddr, &c1size) != 0)
-		//	MessageBox(NULL, _T("1번 클라이언트 접속을 확인했습니다."), _T("Server 메시지"), MB_OK);
-		//if (client2 = accept(server, (LPSOCKADDR)&c2ddr, &c2size) != 0)
-		//	MessageBox(NULL, _T("2번 클라이언트 접속을 확인했습니다."), _T("Server 메시지"), MB_OK);
 		break;
 	case WM_ASYNC:
 		switch (lParam)
 		{
 		case FD_ACCEPT:
-			c1size = sizeof(c1ddr);
-			c2size = sizeof(c2ddr);
-			client1 = accept(server, (LPSOCKADDR)&c1ddr, &c1size);
-			client2 = accept(server, (LPSOCKADDR)&c2ddr, &c2size);
+			if (clientindex >= MAXCLIENT - 1)
+				break;
+			csize[clientindex] = sizeof(cddr[clientindex]);
+			client[clientindex] = accept(server, (LPSOCKADDR)&cddr[clientindex], &csize[clientindex]);
+			WSAAsyncSelect(client[clientindex], hWnd, WM_ASYNC, FD_READ);
+			clientindex++;
 			break;
 		case FD_READ:
+			recv(client[clientindex], , , 0);
+			WinLossDecision
 			break;
 		default:
 			break;
@@ -129,4 +136,74 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 	return 0;
+}
+BOOL WinLossDecision(int x, int y)
+{
+	// 승리판단 4개의 배열
+	int WLArray1[9] = { board[x - 4][y - 4],board[x - 3][y - 3],board[x - 2][y - 2],board[x - 1][y - 1],
+		board[x][y],board[x + 1][y + 1],board[x + 2][y + 2],board[x + 3][y + 3],board[x + 4][y + 4] };		// ↘ 모양
+	int WLArray2[9] = { board[x - 4][y + 4],board[x - 3][y + 3],board[x - 2][y + 2],board[x - 1][y + 1],
+		board[x][y],board[x + 1][y - 1],board[x + 2][y - 2],board[x + 3][y - 3],board[x + 4][y - 4] };		// ↙ 모양
+	int WLArray3[9] = { board[x][y - 4],board[x][y - 3],board[x][y - 2],board[x][y - 1],
+		board[x][y],board[x][y + 1],board[x][y + 2],board[x][y + 3],board[x][y + 4] };						// ↓ 모양
+	int WLArray4[9] = { board[x - 4][y],board[x - 3][y],board[x - 2][y],board[x - 1][y],
+		board[x][y],board[x + 1][y],board[x + 2][y],board[x + 3][y],board[x + 4][y] };						// → 모양
+
+	int i, count = 0;
+	// ↘ 모양
+	for (i = 0; i <= 9; i++)
+	{
+		if (WLArray1[i] == -1)
+			count++;
+		else
+		{
+			if (count == 5)
+				return TRUE;
+			else
+				count = 0;
+		}
+	}
+	count = 0;
+	// ↙ 모양
+	for (i = 0; i <= 9; i++)
+	{
+		if (WLArray2[i] == -1)
+			count++;
+		else
+		{
+			if (count == 5)
+				return TRUE;
+			else
+				count = 0;
+		}
+	}
+	count = 0;
+	// ↓ 모양
+	for (i = 0; i <= 9; i++)
+	{
+		if (WLArray3[i] == -1)
+			count++;
+		else
+		{
+			if (count == 5)
+				return TRUE;
+			else
+				count = 0;
+		}
+	}
+	count = 0;
+	// → 모양
+	for (i = 0; i <= 9; i++)
+	{
+		if (WLArray4[i] == -1)
+			count++;
+		else
+		{
+			if (count == 5)
+				return TRUE;
+			else
+				count = 0;
+		}
+	}
+	return FALSE;
 }

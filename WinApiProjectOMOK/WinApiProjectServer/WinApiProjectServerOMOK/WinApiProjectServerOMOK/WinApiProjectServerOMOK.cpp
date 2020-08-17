@@ -1,6 +1,9 @@
 #include "stdafx.h"
 #include "WinApiProjectServerOMOK.h"
 #include <WinSock2.h>
+#include <stdio.h>
+#include <iostream>
+using namespace std;
 #pragma comment(lib,"ws2_32.lib")
 #pragma comment(lib,"msimg32.lib")
 #define WM_ASYNC WM_USER+2
@@ -14,10 +17,23 @@ ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 // >> : OMOK Start
-#define MAXCLIENT 4							// 최대 접속 클라이언트 수
+#define MAXCLIENT 3							// 최대 접속 클라이언트 수
 #define LINENUMBER 18						// 바둑판 사이즈 19 × 19 (0부터 이므로 18)
-int board[LINENUMBER + 8][LINENUMBER + 8];	// 서버와 클라이언트가 서로 주고 받는 board 배열
+//int board[LINENUMBER + 8][LINENUMBER + 8];	// 서버와 클라이언트가 서로 주고 받는 board 배열
 BOOL WinLossDecision(int x, int y);			// 승패 판정
+typedef struct ServerGo
+{
+	int board[LINENUMBER + 8][LINENUMBER + 8];
+	int player;									// 1P = 1, 2P = -1
+	BOOL WinLose;
+}ServerGo;
+typedef struct PlayerGoxy
+{
+	int x;
+	int y;
+}PlayerGoxy;
+static ServerGo SG;
+static PlayerGoxy xy;
 // >> : OMOK End
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
 {
@@ -68,18 +84,38 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 }
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	HDC hdc;
-	PAINTSTRUCT ps;
+	//HDC hdc;
+	//PAINTSTRUCT ps;
 	// 네트워크 부분
 	static WSADATA wsadata;
 	static SOCKET server;
 	static SOCKET client[MAXCLIENT];
 	static SOCKADDR_IN	sddr = { 0 }, cddr[MAXCLIENT];
-	int clientindex = 0;
+	static int clientindex = 0;
 	int csize[MAXCLIENT];
 	switch (message)
 	{
 	case WM_CREATE:
+	{
+		AllocConsole();
+		freopen("CONOUT$", "wt", stdout);
+		// 구조체 초기화
+		SG.player = 1;								// 플레이어
+		int i, j;									// 바둑판
+		for (i = 0; i <= LINENUMBER + 8; i++)
+			for (j = 0; j <= LINENUMBER + 8; j++)
+				SG.board[i][j] = -2;
+		for (i = 4; i <= 4 + LINENUMBER; i++)
+			for (j = 4; j <= 4 + LINENUMBER; j++)
+				SG.board[i][j] = 0;
+		for (int i = 0; i <= LINENUMBER + 8; i++)
+		{
+			for (int j = 0; j <= LINENUMBER + 8; j++)
+				cout << SG.board[i][j] << ' ';
+			cout << endl;
+		}
+		SG.WinLose = FALSE;							// 승패판단
+		// 네트워크 연결
 		WSAStartup(MAKEWORD(2, 2), &wsadata);
 		server = socket(AF_INET, SOCK_STREAM, 0);
 		sddr.sin_family = AF_INET;	sddr.sin_port = 20;	 sddr.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
@@ -102,8 +138,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			MessageBox(NULL, _T("listen success"), _T("Success"), MB_OK);
 		}
 		WSAAsyncSelect(server, hWnd, WM_ASYNC, FD_ACCEPT);
+	}
 		break;
 	case WM_ASYNC:
+	{
 		switch (lParam)
 		{
 		case FD_ACCEPT:
@@ -112,23 +150,58 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			csize[clientindex] = sizeof(cddr[clientindex]);
 			client[clientindex] = accept(server, (LPSOCKADDR)&cddr[clientindex], &csize[clientindex]);
 			WSAAsyncSelect(client[clientindex], hWnd, WM_ASYNC, FD_READ);
+			if (clientindex == 0)
+			{
+				send(client[clientindex], (char*)&SG, sizeof(ServerGo), 0);
+			}
+			else
+			{
+				SG.player = -1;
+				send(client[clientindex], (char*)&SG, sizeof(ServerGo), 0);
+			}
 			clientindex++;
+			cout << clientindex << endl;
 			break;
 		case FD_READ:
-			recv(client[clientindex], , , 0);
-			WinLossDecision
+			if (SG.player == 1)
+			{
+				recv(client[0], (char *)&xy, sizeof(PlayerGoxy), 0);
+				SG.board[xy.x + 4][xy.y + 4] = 1;
+				if (WinLossDecision(xy.x + 4, xy.y + 4))
+					SG.WinLose = TRUE;
+				SG.player = -1;
+			}
+			else if (SG.player == -1)
+			{
+				recv(client[1], (char *)&xy, sizeof(PlayerGoxy), 0);
+				SG.board[xy.x + 4][xy.y + 4] = -1;
+				if (WinLossDecision(xy.x + 4, xy.y + 4))
+					SG.WinLose = TRUE;
+				SG.player = 1;
+			}
+			for (int i = 0; i < clientindex; ++i)
+				send(client[i], (char *)&SG, sizeof(ServerGo), 0);
+			for (int i = 0; i <= LINENUMBER + 8; i++)
+			{
+				for (int j = 0; j <= LINENUMBER + 8; j++)
+					cout << SG.board[i][j] << ' ';
+				cout << endl;
+			}
 			break;
 		default:
 			break;
 		}
-	case WM_PAINT:
-		hdc = BeginPaint(hWnd, &ps);
-		EndPaint(hWnd, &ps);
-		break;
+	}
+	break;
+	//case WM_PAINT:
+	//	hdc = BeginPaint(hWnd, &ps);
+	//	EndPaint(hWnd, &ps);
+	//	break;
 	case WM_DESTROY:
+		FreeConsole();
 		closesocket(server);
-		closesocket(client1);
-		closesocket(client2);
+		for (int i = 0; i < MAXCLIENT; ++i)
+			closesocket(client[i]);
 		WSACleanup();
 		PostQuitMessage(0);
 		break;
@@ -140,14 +213,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 BOOL WinLossDecision(int x, int y)
 {
 	// 승리판단 4개의 배열
-	int WLArray1[9] = { board[x - 4][y - 4],board[x - 3][y - 3],board[x - 2][y - 2],board[x - 1][y - 1],
-		board[x][y],board[x + 1][y + 1],board[x + 2][y + 2],board[x + 3][y + 3],board[x + 4][y + 4] };		// ↘ 모양
-	int WLArray2[9] = { board[x - 4][y + 4],board[x - 3][y + 3],board[x - 2][y + 2],board[x - 1][y + 1],
-		board[x][y],board[x + 1][y - 1],board[x + 2][y - 2],board[x + 3][y - 3],board[x + 4][y - 4] };		// ↙ 모양
-	int WLArray3[9] = { board[x][y - 4],board[x][y - 3],board[x][y - 2],board[x][y - 1],
-		board[x][y],board[x][y + 1],board[x][y + 2],board[x][y + 3],board[x][y + 4] };						// ↓ 모양
-	int WLArray4[9] = { board[x - 4][y],board[x - 3][y],board[x - 2][y],board[x - 1][y],
-		board[x][y],board[x + 1][y],board[x + 2][y],board[x + 3][y],board[x + 4][y] };						// → 모양
+	int WLArray1[9] = { SG.board[x - 4][y - 4],SG.board[x - 3][y - 3],SG.board[x - 2][y - 2],SG.board[x - 1][y - 1],
+		SG.board[x][y],SG.board[x + 1][y + 1],SG.board[x + 2][y + 2],SG.board[x + 3][y + 3],SG.board[x + 4][y + 4] };		// ↘ 모양
+	int WLArray2[9] = { SG.board[x - 4][y + 4],SG.board[x - 3][y + 3],SG.board[x - 2][y + 2],SG.board[x - 1][y + 1],
+		SG.board[x][y],SG.board[x + 1][y - 1],SG.board[x + 2][y - 2],SG.board[x + 3][y - 3],SG.board[x + 4][y - 4] };		// ↙ 모양
+	int WLArray3[9] = { SG.board[x][y - 4],SG.board[x][y - 3],SG.board[x][y - 2],SG.board[x][y - 1],
+		SG.board[x][y],SG.board[x][y + 1],SG.board[x][y + 2],SG.board[x][y + 3],SG.board[x][y + 4] };						// ↓ 모양
+	int WLArray4[9] = { SG.board[x - 4][y],SG.board[x - 3][y],SG.board[x - 2][y],SG.board[x - 1][y],
+		SG.board[x][y],SG.board[x + 1][y],SG.board[x + 2][y],SG.board[x + 3][y],SG.board[x + 4][y] };						// → 모양
 
 	int i, count = 0;
 	// ↘ 모양

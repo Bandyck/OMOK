@@ -17,23 +17,24 @@ ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 // >> : OMOK Start
-#define MAXCLIENT 3							// 최대 접속 클라이언트 수
-#define LINENUMBER 18						// 바둑판 사이즈 19 × 19 (0부터 이므로 18)
-//int board[LINENUMBER + 8][LINENUMBER + 8];	// 서버와 클라이언트가 서로 주고 받는 board 배열
-BOOL WinLossDecision(int x, int y);			// 승패 판정
+#define MAXCLIENT 3								// 최대 접속 클라이언트 수
+#define LINENUMBER 18							// 바둑판 사이즈 19 × 19 (0부터 이므로 18)
+
 typedef struct ServerGo
 {
 	int board[LINENUMBER + 9][LINENUMBER + 9];
-	int player;									// 1P = 1, 2P = -1
+	int player;	
 	BOOL WinLose;
-}ServerGo;
+}ServerGo;		// 보낼 구조체(바둑판, 플레이어, 승패판정
 typedef struct PlayerGoxy
 {
 	int x;
 	int y;
-}PlayerGoxy;
+}PlayerGoxy;	// 받을 구조체(돌을 놓은 좌표)
 static ServerGo SG;
 static PlayerGoxy xy;
+
+BOOL WinLossDecision(int x, int y);				// 승패 판정
 // >> : OMOK End
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
 {
@@ -84,8 +85,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 }
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	//HDC hdc;
-	//PAINTSTRUCT ps;
 	// 네트워크 부분
 	static WSADATA wsadata;
 	static SOCKET server;
@@ -97,6 +96,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 	case WM_CREATE:
 	{
+		// 콘솔 출력
 		AllocConsole();
 		freopen("CONOUT$", "wt", stdout);
 		// 구조체 초기화
@@ -123,6 +123,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		switch (lParam)
 		{
 		case FD_ACCEPT:
+		{
 			if (clientindex >= MAXCLIENT - 1)
 				break;
 			csize[clientindex] = sizeof(cddr[clientindex]);
@@ -139,39 +140,35 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 			clientindex++;
 			SG.player = 1;
+		}
 			break;
 		case FD_READ:
+		{
 			if (SG.player == 1)
 			{
 				recv(client[0], (char *)&xy, sizeof(PlayerGoxy), 0);
 				SG.board[xy.x + 4][xy.y + 4] = 1;
-				//if (WinLossDecision(xy.x + 4, xy.y + 4))
-				//	SG.WinLose = TRUE;
+				if (WinLossDecision(xy.x + 4, xy.y + 4))
+					SG.WinLose = TRUE;
 				SG.player = -1;
-				for (int i = 0; i < clientindex; ++i)
-					send(client[i], (char *)&SG, sizeof(ServerGo), 0);
 			}
 			else if (SG.player == -1)
 			{
 				recv(client[1], (char *)&xy, sizeof(PlayerGoxy), 0);
 				SG.board[xy.x + 4][xy.y + 4] = -1;
-				//if (WinLossDecision(xy.x + 4, xy.y + 4))
-				//	SG.WinLose = TRUE;
+				if (WinLossDecision(xy.x + 4, xy.y + 4))
+					SG.WinLose = TRUE;
 				SG.player = 1;
-				for (int i = 0; i < clientindex; ++i)
-					send(client[i], (char *)&SG, sizeof(ServerGo), 0);
 			}
-
+			for (int i = 0; i < clientindex; ++i)
+				send(client[i], (char *)&SG, sizeof(ServerGo), 0);
+		}
 			break;
 		default:
 			break;
 		}
 	}
 	break;
-	//case WM_PAINT:
-	//	hdc = BeginPaint(hWnd, &ps);
-	//	EndPaint(hWnd, &ps);
-	//	break;
 	case WM_DESTROY:
 		FreeConsole();
 		closesocket(server);

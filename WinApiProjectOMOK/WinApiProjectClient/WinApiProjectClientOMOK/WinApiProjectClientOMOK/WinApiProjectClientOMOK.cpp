@@ -19,40 +19,34 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 
 // >> : OMOK Start
-#define BSIZE 15				// 클릭 판정을 위한 원의 반지름
-#define LinetoLineSize 36		// 바둑판 선과 선 사이의 간격
-#define LINENUMBER 18			// 바둑판 사이즈 19 × 19 (0부터 이므로 18)
-
-// 보낼 구조체(돌을 놓은 좌표)
+#define BSIZE 15								// 클릭 판정을 위한 원의 반지름
+#define LinetoLineSize 36						// 바둑판 선과 선 사이의 간격
+#define LINENUMBER 18							// 바둑판 사이즈 19 × 19 (0부터 이므로 18)
 typedef struct PlayerGoxy
 {
 	int x;
 	int y;
-}PlayerGoxy;
-// 받을 구조체(바둑판, 자기 턴인지, 승패판정)
+}PlayerGoxy;	// 보낼 구조체(돌을 놓은 좌표)
 typedef struct ServerGo
 {
 	int board[LINENUMBER + 9][LINENUMBER + 9];
 	BOOL turn;
 	BOOL WinLose;
-}ServerGo;
+}ServerGo;		// 받을 구조체(바둑판, 자기 턴인지, 승패판정)
 static PlayerGoxy xy;
 static ServerGo SG;
 
+// 그림 부분
 HBITMAP hBlackImage;			// 흑돌
 BITMAP bitBlack;				
 HBITMAP hWhiteImage;			// 백돌
 BITMAP bitWhite;				
-
 void CreateBitmap();
-void DrawBitmap(HWND hWnd, HDC hdc);
-//void DrawStoneBlack(HWND hWnd, HDC hdc, int x, int y);		// 흑돌 그리는 함수
-//void DrawStoneWhite(HWND hWnd, HDC hdc, int x, int y);		// 백돌 그리는 함수
-void DrawStone(HWND hWnd, HDC hdc, ServerGo SG);			// 돌 그리는 함수
+void DrawBitmap(HWND hWnd, HDC hdc);				// 기본 UI 그리는 함수
+void DrawStone(HWND hWnd, HDC hdc, ServerGo SG);	// 돌 그리는 함수
 void DeleteBitmap();
 																												 //	 0 : 돌이 없는 상태
 // 돌 놓기 판정																									 //  1 : 플레이어 1의 돌이 존재(흑돌)
-//int board[LINENUMBER + 8][LINENUMBER + 8];					// 서버와 클라이언트가 서로 주고 받는 board 배열	 // -1 : 플레이어 2의 돌이 존재(백돌)
 POINT checkboard[LINENUMBER + 1][LINENUMBER + 1];																 // -2 : 바둑판 외곽처리
 double LengthPts(int x1, int y1, int x2, int y2)																
 {																												
@@ -65,10 +59,6 @@ BOOL InCircle(int x, int y, int mx, int my)
 	else
 		return FALSE;
 }
-
-// 승패 판정
-//BOOL WinLossDecisionBlack(int x, int y);
-//BOOL WinLossDecisionWhite(int x, int y);
 
 // >> : OMOK END
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
@@ -122,9 +112,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	HDC hdc;
 	PAINTSTRUCT ps;
-	// static int x, y;
-	//static BOOL SelectionBlack;
-	//static BOOL SelectionWhite;
 	int mx, my;
 	// 네트워크 부분
 	static WSADATA wsadata;
@@ -134,11 +121,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
 	case WM_CREATE:
 	{
+		// 콘솔 출력
 		AllocConsole();
 		freopen("CONOUT$", "wt", stdout);
-		int i, j;
+		// 비트맵 생성
 		CreateBitmap();
 		// 돌 놓기 판정을 위한 좌표보드 점 찍어두기
+		int i, j;
 		for (i = 0; i <= LINENUMBER; i++)
 		{
 			for (j = 0; j <= LINENUMBER; j++)
@@ -147,16 +136,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				checkboard[i][j].y = 30 + LinetoLineSize * j;
 			}
 		}
-		// board 배열 초기화
-		//for (i = 0; i <= LINENUMBER + 4; i++)
-		//	for (j = 0; j <= LINENUMBER + 4; j++)
-		//		board[i][j] = -2;
-		//for (i = 4; i <= 4 + LINENUMBER; i++)
-		//	for (j = 4; j <= 4 + LINENUMBER; j++)
-		//		board[i][j] = 0;
-		//SelectionBlack = FALSE;
-		//SelectionWhite = FALSE;
-
 		// 네트워크 부분
 		WSAStartup(MAKEWORD(2, 2), &wsadata);
 		server = socket(AF_INET, SOCK_STREAM, 0);		
@@ -165,8 +144,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		connect(server, (LPSOCKADDR)&sddr, sizeof(sddr));
 	}
 		break;
-	// 마우스 왼쪽 버튼 : 1P(흑돌)
 	case WM_LBUTTONDOWN:
+	{
 		mx = LOWORD(lParam);
 		my = HIWORD(lParam);
 		for (int i = 0; i <= LINENUMBER; i++)
@@ -174,47 +153,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			for (int j = 0; j <= LINENUMBER; j++)
 			{
 				if (InCircle(checkboard[i][j].x, checkboard[i][j].y, mx, my))
-				{	
+				{
 					if (SG.board[i + 4][j + 4] == 0)
 					{
 						xy.x = i;
 						xy.y = j;
-						cout << sizeof(PlayerGoxy);
 						send(server, (char *)&xy, sizeof(PlayerGoxy), 0);
-						//SelectionBlack = TRUE;
-						//board[i + 4][j + 4] = 1;
-						//InvalidateRgn(hWnd, NULL, FALSE);
 					}
-					i = LINENUMBER+1;
+					i = LINENUMBER + 1;
 					break;
 				}
 			}
 		}
+	}
 			break;
-	// 마우스 오른쪽 버튼 : 2P(백돌)
-	//case WM_RBUTTONDOWN:
-	//	mx = LOWORD(lParam);
-	//	my = HIWORD(lParam);
-	//	for (int i = 0; i <= LINENUMBER; i++)
-	//	{
-	//		for (int j = 0; j <= LINENUMBER; j++)
-	//		{
-	//			if (InCircle(checkboard[i][j].x, checkboard[i][j].y, mx, my))
-	//			{
-	//				if (board[i + 4][j + 4] == 0)
-	//				{
-	//					xy.x = i;
-	//					xy.y = j;
-	//					SelectionWhite = TRUE;
-	//					board[i + 4][j + 4] = -1;
-	//					InvalidateRgn(hWnd, NULL, FALSE);
-	//				}
-	//				i = LINENUMBER + 1;
-	//				break;
-	//			}
-	//		}
-	//	}
-	//	break;
 	case WM_ASYNC:
 		switch (lParam)
 		{
@@ -230,26 +182,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             hdc = BeginPaint(hWnd, &ps);
 			DrawBitmap(hWnd, hdc);
 			DrawStone(hWnd, hdc, SG);
-			//if (SelectionBlack)
-			//{
-			//	DrawStoneBlack(hWnd, hdc, xy.x, xy.y);
-			//	SelectionBlack = FALSE;
-			//}
-			//if (SelectionWhite)
-			//{
-			//	DrawStoneWhite(hWnd, hdc, xy.x, xy.y);
-			//	SelectionWhite = FALSE;
-			//}
-			//if (WinLossDecisionBlack(xy.x + 4, xy.y + 4))
-			//{
-			//	TCHAR Player1WIN[] = _T("1P WIN!!!");
-			//	TextOut(hdc, 20, 20, Player1WIN, _tcslen(Player1WIN));
-			//}
-			//if (WinLossDecisionWhite(xy.x + 4, xy.y + 4))
-			//{
-			//	TCHAR Player2WIN[] = _T("2P WIN!!!");
-			//	TextOut(hdc, 20, 20, Player2WIN, _tcslen(Player2WIN));
-			//}
+			if (SG.WinLose)
+				TextOut(hdc, 100, 100, _T("Win!"), 10);
             EndPaint(hWnd, &ps);
         }
         break;
@@ -276,10 +210,10 @@ void CreateBitmap()
 }
 void DrawBitmap(HWND hWnd, HDC hdc)
 {
+	// 기본 UI
 	HDC hMenDC;
 	HBITMAP hOldBitmap;
 	int bx, by;
-	// 기본 UI
 	for (int i = 0; i <= LINENUMBER; i++)
 	{	// 바둑판 격자
 		MoveToEx(hdc, 475, 30 + LinetoLineSize * i, NULL);
@@ -292,7 +226,6 @@ void DrawBitmap(HWND hWnd, HDC hdc)
 		hOldBitmap = (HBITMAP)SelectObject(hMenDC, hBlackImage);
 		bx = bitBlack.bmWidth;
 		by = bitBlack.bmHeight;
-		//BitBlt(hdc, 1132, 15, bx, by, hMenDC, 0, 0, SRCCOPY);
 		TransparentBlt(hdc, 1152, 30, bx, by, hMenDC, 0, 0, bx, by, RGB(255, 0, 255));
 		SelectObject(hMenDC, hOldBitmap);
 		DeleteDC(hMenDC);
@@ -302,7 +235,6 @@ void DrawBitmap(HWND hWnd, HDC hdc)
 		hOldBitmap = (HBITMAP)SelectObject(hMenDC, hWhiteImage);
 		bx = bitWhite.bmWidth;
 		by = bitWhite.bmHeight;
-		//BitBlt(hdc, 1132, 57, bx, by, hMenDC, 0, 0, SRCCOPY);
 		TransparentBlt(hdc, 1152, 72, bx, by, hMenDC, 0, 0, bx, by, RGB(255, 0, 255));
 		SelectObject(hMenDC, hOldBitmap);
 		DeleteDC(hMenDC);
@@ -314,38 +246,6 @@ void DrawBitmap(HWND hWnd, HDC hdc)
 		TextOut(hdc, 1189, 77, Player2, _tcslen(Player2));	// 2P 출력
 	}
 }
-//void DrawStoneBlack(HWND hWnd, HDC hdc, int x, int y)
-//{
-//	HDC hMenDC;
-//	HBITMAP hOldBitmap;
-//	int bx, by;
-//	{	// 흑돌
-//		hMenDC = CreateCompatibleDC(hdc);
-//		hOldBitmap = (HBITMAP)SelectObject(hMenDC, hBlackImage);
-//		bx = bitBlack.bmWidth;
-//		by = bitBlack.bmHeight;
-//		//BitBlt(hdc, 1132, 15, bx, by, hMenDC, 0, 0, SRCCOPY);
-//		TransparentBlt(hdc, 459 + 36 * x, 14 + 36 * y, bx, by, hMenDC, 0, 0, bx, by, RGB(255, 0, 255));
-//		SelectObject(hMenDC, hOldBitmap);
-//		DeleteDC(hMenDC);
-//	}
-//}
-//void DrawStoneWhite(HWND hWnd, HDC hdc, int x, int y)
-//{
-//	HDC hMenDC;
-//	HBITMAP hOldBitmap;
-//	int bx, by;
-//	{	// 백돌
-//		hMenDC = CreateCompatibleDC(hdc);
-//		hOldBitmap = (HBITMAP)SelectObject(hMenDC, hWhiteImage);
-//		bx = bitWhite.bmWidth;
-//		by = bitWhite.bmHeight;
-//		//BitBlt(hdc, 1132, 15, bx, by, hMenDC, 0, 0, SRCCOPY);
-//		TransparentBlt(hdc, 459 + 36 * x, 14 + 36 * y, bx, by, hMenDC, 0, 0, bx, by, RGB(255, 0, 255));
-//		SelectObject(hMenDC, hOldBitmap);
-//		DeleteDC(hMenDC);
-//	}
-//}
 void DrawStone(HWND hWnd, HDC hdc, ServerGo SG)
 {
 	HDC hMenDC;
@@ -362,7 +262,6 @@ void DrawStone(HWND hWnd, HDC hdc, ServerGo SG)
 					hOldBitmap = (HBITMAP)SelectObject(hMenDC, hWhiteImage);
 					bx = bitWhite.bmWidth;
 					by = bitWhite.bmHeight;
-					//BitBlt(hdc, 1132, 15, bx, by, hMenDC, 0, 0, SRCCOPY);
 					TransparentBlt(hdc, 459 + 36 * i, 14 + 36 * j, bx, by, hMenDC, 0, 0, bx, by, RGB(255, 0, 255));
 					SelectObject(hMenDC, hOldBitmap);
 					DeleteDC(hMenDC);
@@ -375,7 +274,6 @@ void DrawStone(HWND hWnd, HDC hdc, ServerGo SG)
 					hOldBitmap = (HBITMAP)SelectObject(hMenDC, hBlackImage);
 					bx = bitBlack.bmWidth;
 					by = bitBlack.bmHeight;
-					//BitBlt(hdc, 1132, 15, bx, by, hMenDC, 0, 0, SRCCOPY);
 					TransparentBlt(hdc, 459 + 36 * i, 14 + 36 * j, bx, by, hMenDC, 0, 0, bx, by, RGB(255, 0, 255));
 					SelectObject(hMenDC, hOldBitmap);
 					DeleteDC(hMenDC);
@@ -388,143 +286,3 @@ void DeleteBitmap()
 	DeleteObject(hWhiteImage);
 	DeleteObject(hBlackImage);
 }
-//BOOL WinLossDecisionBlack(int x, int y)
-//{
-//	// 승리판단 4개의 배열
-//	int WLArray1[9] = { board[x - 4][y - 4],board[x - 3][y - 3],board[x - 2][y - 2],board[x - 1][y - 1],
-//		board[x][y],board[x + 1][y + 1],board[x + 2][y + 2],board[x + 3][y + 3],board[x + 4][y + 4] };		// ↘ 모양
-//	int WLArray2[9] = { board[x - 4][y + 4],board[x - 3][y + 3],board[x - 2][y + 2],board[x - 1][y + 1],
-//		board[x][y],board[x + 1][y - 1],board[x + 2][y - 2],board[x + 3][y - 3],board[x + 4][y - 4] };		// ↙ 모양
-//	int WLArray3[9] = { board[x][y - 4],board[x][y - 3],board[x][y - 2],board[x][y - 1],
-//		board[x][y],board[x][y + 1],board[x][y + 2],board[x][y + 3],board[x][y + 4] };						// ↓ 모양
-//	int WLArray4[9] = { board[x - 4][y],board[x - 3][y],board[x - 2][y],board[x - 1][y],
-//		board[x][y],board[x + 1][y],board[x + 2][y],board[x + 3][y],board[x + 4][y] };						// → 모양
-//
-//	int i, count = 0;
-//	// ↘ 모양
-//	for (i = 0; i <= 9; i++)
-//	{
-//		if (WLArray1[i] == 1)
-//			count++;
-//		else
-//		{
-//			if (count == 5)
-//				return TRUE;
-//			else
-//				count = 0;
-//		}
-//	}
-//	count = 0;
-//	// ↙ 모양
-//	for (i = 0; i <= 9; i++)
-//	{
-//		if (WLArray2[i] == 1)
-//			count++;
-//		else
-//		{
-//			if (count == 5)
-//				return TRUE;
-//			else
-//				count = 0;
-//		}
-//	}
-//	count = 0;
-//	// ↓ 모양
-//	for (i = 0; i <= 9; i++)
-//	{
-//		if (WLArray3[i] == 1)
-//			count++;
-//		else
-//		{
-//			if (count == 5)
-//				return TRUE;
-//			else
-//				count = 0;
-//		}
-//	}
-//	count = 0;
-//	// → 모양
-//	for (i = 0; i <= 9; i++)
-//	{
-//		if (WLArray4[i] == 1)
-//			count++;
-//		else
-//		{
-//			if (count == 5)
-//				return TRUE;
-//			else
-//				count = 0;
-//		}
-//	}
-//	return FALSE;
-//}
-//BOOL WinLossDecisionWhite(int x, int y)
-//{
-//	// 승리판단 4개의 배열
-//	int WLArray1[9] = { board[x - 4][y - 4],board[x - 3][y - 3],board[x - 2][y - 2],board[x - 1][y - 1],
-//		board[x][y],board[x + 1][y + 1],board[x + 2][y + 2],board[x + 3][y + 3],board[x + 4][y + 4] };		// ↘ 모양
-//	int WLArray2[9] = { board[x - 4][y + 4],board[x - 3][y + 3],board[x - 2][y + 2],board[x - 1][y + 1],
-//		board[x][y],board[x + 1][y - 1],board[x + 2][y - 2],board[x + 3][y - 3],board[x + 4][y - 4] };		// ↙ 모양
-//	int WLArray3[9] = { board[x][y - 4],board[x][y - 3],board[x][y - 2],board[x][y - 1],
-//		board[x][y],board[x][y + 1],board[x][y + 2],board[x][y + 3],board[x][y + 4] };						// ↓ 모양
-//	int WLArray4[9] = { board[x - 4][y],board[x - 3][y],board[x - 2][y],board[x - 1][y],
-//		board[x][y],board[x + 1][y],board[x + 2][y],board[x + 3][y],board[x + 4][y] };						// → 모양
-//
-//	int i, count = 0;
-//	// ↘ 모양
-//	for (i = 0; i <= 9; i++)
-//	{
-//		if (WLArray1[i] == -1)
-//			count++;
-//		else
-//		{
-//			if (count == 5)
-//				return TRUE;
-//			else
-//				count = 0;
-//		}
-//	}
-//	count = 0;
-//	// ↙ 모양
-//	for (i = 0; i <= 9; i++)
-//	{
-//		if (WLArray2[i] == -1)
-//			count++;
-//		else
-//		{
-//			if (count == 5)
-//				return TRUE;
-//			else
-//				count = 0;
-//		}
-//	}
-//	count = 0;
-//	// ↓ 모양
-//	for (i = 0; i <= 9; i++)
-//	{
-//		if (WLArray3[i] == -1)
-//			count++;
-//		else
-//		{
-//			if (count == 5)
-//				return TRUE;
-//			else
-//				count = 0;
-//		}
-//	}
-//	count = 0;
-//	// → 모양
-//	for (i = 0; i <= 9; i++)
-//	{
-//		if (WLArray4[i] == -1)
-//			count++;
-//		else
-//		{
-//			if (count == 5)
-//				return TRUE;
-//			else
-//				count = 0;
-//		}
-//	}
-//	return FALSE;
-//}

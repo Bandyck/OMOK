@@ -2,6 +2,9 @@
 #include "WinApiProjectClientOMOK.h"
 #include <math.h>
 #include <WinSock2.h>
+#include <stdio.h>
+#include <iostream>
+using namespace std;
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib,"msimg32.lib")
 #define WM_ASYNC WM_USER+2
@@ -29,7 +32,7 @@ typedef struct PlayerGoxy
 // 받을 구조체(바둑판, 자기 턴인지, 승패판정)
 typedef struct ServerGo
 {
-	int board[LINENUMBER + 8][LINENUMBER + 8];
+	int board[LINENUMBER + 9][LINENUMBER + 9];
 	BOOL turn;
 	BOOL WinLose;
 }ServerGo;
@@ -49,7 +52,7 @@ void DrawStone(HWND hWnd, HDC hdc, ServerGo SG);			// 돌 그리는 함수
 void DeleteBitmap();
 																												 //	 0 : 돌이 없는 상태
 // 돌 놓기 판정																									 //  1 : 플레이어 1의 돌이 존재(흑돌)
-int board[LINENUMBER + 8][LINENUMBER + 8];					// 서버와 클라이언트가 서로 주고 받는 board 배열	 // -1 : 플레이어 2의 돌이 존재(백돌)
+//int board[LINENUMBER + 8][LINENUMBER + 8];					// 서버와 클라이언트가 서로 주고 받는 board 배열	 // -1 : 플레이어 2의 돌이 존재(백돌)
 POINT checkboard[LINENUMBER + 1][LINENUMBER + 1];																 // -2 : 바둑판 외곽처리
 double LengthPts(int x1, int y1, int x2, int y2)																
 {																												
@@ -131,6 +134,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
 	case WM_CREATE:
 	{
+		AllocConsole();
+		freopen("CONOUT$", "wt", stdout);
 		int i, j;
 		CreateBitmap();
 		// 돌 놓기 판정을 위한 좌표보드 점 찍어두기
@@ -157,15 +162,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		server = socket(AF_INET, SOCK_STREAM, 0);		
 		sddr.sin_family = AF_INET;	sddr.sin_port = 20; sddr.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
 		WSAAsyncSelect(server, hWnd, WM_ASYNC, FD_READ);
-		if (connect(server, (LPSOCKADDR)&sddr, sizeof(sddr)) == SOCKET_ERROR)
-		{
-			MessageBox(NULL, _T("client connect failed"), _T("Error"), MB_OK);
-			return 0;
-		}
-		else
-		{
-			MessageBox(NULL, _T("client connect success"), _T("Success"), MB_OK);
-		}
+		connect(server, (LPSOCKADDR)&sddr, sizeof(sddr));
 	}
 		break;
 	// 마우스 왼쪽 버튼 : 1P(흑돌)
@@ -182,6 +179,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					{
 						xy.x = i;
 						xy.y = j;
+						cout << sizeof(PlayerGoxy);
 						send(server, (char *)&xy, sizeof(PlayerGoxy), 0);
 						//SelectionBlack = TRUE;
 						//board[i + 4][j + 4] = 1;
@@ -256,6 +254,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         break;
     case WM_DESTROY:
+		FreeConsole();
 		DeleteBitmap();
 		closesocket(server);
 		WSACleanup();
@@ -353,10 +352,10 @@ void DrawStone(HWND hWnd, HDC hdc, ServerGo SG)
 	HBITMAP hOldBitmap;
 	int bx, by;
 	int i, j;
-	for (i = 0; i <= LINENUMBER + 4; i++)
-		for (j = 0; j <= LINENUMBER + 4; j++)
+	for (i = 0; i <= LINENUMBER + 8; i++)
+		for (j = 0; j <= LINENUMBER + 8; j++)
 		{
-			if (SG.board[i+4][j+4] == 1)
+			if (SG.board[i + 4][j + 4] == -1)
 			{
 				{	// 백돌
 					hMenDC = CreateCompatibleDC(hdc);
@@ -369,7 +368,7 @@ void DrawStone(HWND hWnd, HDC hdc, ServerGo SG)
 					DeleteDC(hMenDC);
 				}
 			}
-			else if (SG.board[i+4][j+4] == -1)
+			else if (SG.board[i + 4][j + 4] == 1)
 			{
 				{	// 흑돌
 					hMenDC = CreateCompatibleDC(hdc);

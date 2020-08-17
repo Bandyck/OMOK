@@ -23,7 +23,7 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 BOOL WinLossDecision(int x, int y);			// 승패 판정
 typedef struct ServerGo
 {
-	int board[LINENUMBER + 8][LINENUMBER + 8];
+	int board[LINENUMBER + 9][LINENUMBER + 9];
 	int player;									// 1P = 1, 2P = -1
 	BOOL WinLose;
 }ServerGo;
@@ -100,43 +100,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		AllocConsole();
 		freopen("CONOUT$", "wt", stdout);
 		// 구조체 초기화
-		SG.player = 1;								// 플레이어
 		int i, j;									// 바둑판
 		for (i = 0; i <= LINENUMBER + 8; i++)
 			for (j = 0; j <= LINENUMBER + 8; j++)
 				SG.board[i][j] = -2;
-		for (i = 4; i <= 4 + LINENUMBER; i++)
-			for (j = 4; j <= 4 + LINENUMBER; j++)
+		for (i = 4; i <= LINENUMBER + 4; i++)
+			for (j = 4; j <= LINENUMBER + 4; j++)
 				SG.board[i][j] = 0;
-		for (int i = 0; i <= LINENUMBER + 8; i++)
-		{
-			for (int j = 0; j <= LINENUMBER + 8; j++)
-				cout << SG.board[i][j] << ' ';
-			cout << endl;
-		}
+		SG.player = 1;								// 플레이어
 		SG.WinLose = FALSE;							// 승패판단
 		// 네트워크 연결
 		WSAStartup(MAKEWORD(2, 2), &wsadata);
 		server = socket(AF_INET, SOCK_STREAM, 0);
 		sddr.sin_family = AF_INET;	sddr.sin_port = 20;	 sddr.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
-		if (bind(server, (LPSOCKADDR)&sddr, sizeof(sddr)))
-		{
-			MessageBox(NULL, _T("server binding failed"), _T("Error"), MB_OK);
-			return 0;
-		}
-		else
-		{
-			MessageBox(NULL, _T("server binding success"), _T("Success"), MB_OK);
-		}
-		if (listen(server, MAXCLIENT) == SOCKET_ERROR)
-		{
-			MessageBox(NULL, _T("listen failed"), _T("Error"), MB_OK);
-			return 0;
-		}
-		else
-		{
-			MessageBox(NULL, _T("listen success"), _T("Success"), MB_OK);
-		}
+		bind(server, (LPSOCKADDR)&sddr, sizeof(sddr));
+		listen(server, MAXCLIENT);
 		WSAAsyncSelect(server, hWnd, WM_ASYNC, FD_ACCEPT);
 	}
 		break;
@@ -160,33 +138,30 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				send(client[clientindex], (char*)&SG, sizeof(ServerGo), 0);
 			}
 			clientindex++;
-			cout << clientindex << endl;
+			SG.player = 1;
 			break;
 		case FD_READ:
 			if (SG.player == 1)
 			{
 				recv(client[0], (char *)&xy, sizeof(PlayerGoxy), 0);
 				SG.board[xy.x + 4][xy.y + 4] = 1;
-				if (WinLossDecision(xy.x + 4, xy.y + 4))
-					SG.WinLose = TRUE;
+				//if (WinLossDecision(xy.x + 4, xy.y + 4))
+				//	SG.WinLose = TRUE;
 				SG.player = -1;
+				for (int i = 0; i < clientindex; ++i)
+					send(client[i], (char *)&SG, sizeof(ServerGo), 0);
 			}
 			else if (SG.player == -1)
 			{
 				recv(client[1], (char *)&xy, sizeof(PlayerGoxy), 0);
 				SG.board[xy.x + 4][xy.y + 4] = -1;
-				if (WinLossDecision(xy.x + 4, xy.y + 4))
-					SG.WinLose = TRUE;
+				//if (WinLossDecision(xy.x + 4, xy.y + 4))
+				//	SG.WinLose = TRUE;
 				SG.player = 1;
+				for (int i = 0; i < clientindex; ++i)
+					send(client[i], (char *)&SG, sizeof(ServerGo), 0);
 			}
-			for (int i = 0; i < clientindex; ++i)
-				send(client[i], (char *)&SG, sizeof(ServerGo), 0);
-			for (int i = 0; i <= LINENUMBER + 8; i++)
-			{
-				for (int j = 0; j <= LINENUMBER + 8; j++)
-					cout << SG.board[i][j] << ' ';
-				cout << endl;
-			}
+
 			break;
 		default:
 			break;

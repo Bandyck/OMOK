@@ -97,8 +97,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_CREATE:
 	{
 		// 콘솔 출력
-		AllocConsole();
-		freopen("CONOUT$", "wt", stdout);
+		//AllocConsole();
+		//freopen("CONOUT$", "wt", stdout);
 		// 구조체 초기화
 		int i, j;									// 바둑판
 		for (i = 0; i <= LINENUMBER + 8; i++)
@@ -146,22 +146,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 			if (SG.player == 1)
 			{
-				recv(client[0], (char *)&xy, sizeof(PlayerGoxy), 0);
+				// recv(client[0], (char *)&xy, sizeof(PlayerGoxy), 0);
 				SG.board[xy.x + 4][xy.y + 4] = 1;
 				if (WinLossDecision(xy.x + 4, xy.y + 4))
 					SG.WinLose = TRUE;
+				for (int i = 0; i < clientindex; ++i)
+					send(client[i], (char *)&SG, sizeof(ServerGo), 0);
 				SG.player = -1;
 			}
 			else if (SG.player == -1)
 			{
-				recv(client[1], (char *)&xy, sizeof(PlayerGoxy), 0);
+				// recv(client[1], (char *)&xy, sizeof(PlayerGoxy), 0);
 				SG.board[xy.x + 4][xy.y + 4] = -1;
 				if (WinLossDecision(xy.x + 4, xy.y + 4))
 					SG.WinLose = TRUE;
+				for (int i = 0; i < clientindex; ++i)
+					send(client[i], (char *)&SG, sizeof(ServerGo), 0);
 				SG.player = 1;
 			}
-			for (int i = 0; i < clientindex; ++i)
-				send(client[i], (char *)&SG, sizeof(ServerGo), 0);
 		}
 			break;
 		default:

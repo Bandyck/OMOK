@@ -30,7 +30,7 @@ typedef struct PlayerGoxy
 typedef struct ServerGo
 {
 	int board[LINENUMBER + 9][LINENUMBER + 9];
-	BOOL turn;
+	int player;
 	BOOL WinLose;
 }ServerGo;		// 받을 구조체(바둑판, 자기 턴인지, 승패판정)
 static PlayerGoxy xy;
@@ -122,8 +122,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_CREATE:
 	{
 		// 콘솔 출력
-		AllocConsole();
-		freopen("CONOUT$", "wt", stdout);
+		//AllocConsole();
+		//freopen("CONOUT$", "wt", stdout);
 		// 비트맵 생성
 		CreateBitmap();
 		// 돌 놓기 판정을 위한 좌표보드 점 찍어두기
